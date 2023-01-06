@@ -26,6 +26,7 @@
             
 from abaqusConstants import *
 from math import sqrt
+from kernelAccess import mdb
 
 modelName = 'meshModel'
 partName = 'meshPart'
@@ -57,7 +58,7 @@ def initialChecks():
     if (len(mdb.models[modelName].parts[partName].nodes) == 0):
         return 'There is no mesh'
 
-def maxLabels():
+def maxLabels(workPart):
     global maxElLabel
     global maxNodLabel
     for el in workPart.elements:
@@ -78,7 +79,7 @@ def initializeContainers():
     nodesCorrelations = [-1 for i in range(maxNodLabel+1)]
     processedNeigh = [[] for i in range(maxElLabel+1)]
 
-def calculateCenters():
+def calculateCenters(workPart):
     #------- Calculate element centers
     for el in workPart.elements:
         sumX = 0
@@ -90,7 +91,7 @@ def calculateCenters():
             sumZ += nod.coordinates[2]
         elementCenters[el.label] = (sumX/3,sumY/3,sumZ/3)
 
-def refineMesh():
+def refineMesh(workPart, destPart):
 #------- Main processing loop
     for el in workPart.elements:
         #------ get edges -------
@@ -203,11 +204,11 @@ def refineMesh():
                 return 'Edge element connects more than two elements, cannot process'
     return 'Malla cargada correctamente'
 
-initialChecks()
-workPart = mdb.models[modelName].parts[partName]
-destPart = mdb.models[modelName].Part(name = destPartName, dimensionality=TWO_D_PLANAR , type=DEFORMABLE_BODY)
-maxLabels()
-initializeContainers()
-calculateCenters()
-output = refineMesh()
-print output
+def remesh():
+    initialChecks()
+    workPart = mdb.models[modelName].parts[partName]
+    destPart = mdb.models[modelName].Part(name = destPartName, dimensionality=TWO_D_PLANAR , type=DEFORMABLE_BODY)
+    maxLabels(workPart)
+    initializeContainers()
+    calculateCenters(workPart)
+    return refineMesh(workPart, destPart)
