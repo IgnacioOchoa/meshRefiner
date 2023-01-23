@@ -26,7 +26,7 @@
             
 from abaqusConstants import *
 from math import sqrt
-from kernelAccess import mdb
+from abaqus import mdb
 
 modelName = 'meshModel'
 partName = 'meshPart'
