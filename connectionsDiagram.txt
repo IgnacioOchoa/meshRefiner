@@ -1,0 +1,69 @@
+
+References
+
+█═══►  Connection via messaging system to target AFXKeyword (which are AFXTargets)
+───┤│  Query registered on the DB that calls the indicated function
+────►  Calls or updates the pointed to object
+█───►  Connection via messaging system to indicated function in enclosing object
+
+
+
+	┌────────────┐
+	│	show()	 │ (post query on mdb.models) ───────────────────────┐
+	└────────────┘												   	 │
+	┌────────────┐												   	 │
+	│	hide()	 │ (unpost query on mdb.models)					   	 │
+	└────────────┘												   	 │
+																	 ▼
+					  ┌───────────────────┐		 		┌─────────────────────────┐
+					  │  query mdb.models ├──-query───┤││ onModelChangedFromMDB() │ 
+					  └───────────────────┘   	    	└────────────┬────────────┘ 
+										     						 │
+   ┌───────────────────┐     ╔═════════════════════╗	(1)	   ┌─────┤			(3)
+   │     modelNameCB   │█═══►║   modelNameKeyword  ║◄──────────┘     ├───────────────────┐
+   └───────────────────┘     ╚═════════════════════╝			 (2) ▼					 │
+             ▲                         ▄				 ┌───────────────────────┐		 │
+             └─────────────────────────┼─────────────────┤ 	  updateCBModels()   │		 │
+									   │				 └───────────────────────┘		 │
+									   ▼ (4)											 │
+						 ┌───────────────────────────┐									 │
+                         │  onModelChangedFromGUI()  │									 │
+					   	 └─────────────┬─────────────┘									 │
+                                       │												 │
+									   ▼ (5) 											 │
+						 ┌───────────────────────────┐									 │
+                         │  	  updateParts()  	 │◄──────────────────────────────────┘
+					   	 └─────────────┬─────────────┘(post & unpost query on mdb.model['model'].parts)									   									   
+									   │
+									   ▼ (6)
+   ┌───────────────────┐	 ╔═════════════════════╗
+   │	partNameCB     │█═══►║   partNameKeyword   ║
+   └───────────────────┘     ╚═════════════════════╝
+			 ▲                         					 ┌───────────────────────┐
+             └───────────────────────────────────────────┤ 	  updateCBParts()    │
+									    				 └───────────────────────┘
+																	▲
+																	│
+		┌───────────────────────────┐         	      ┌─────────────┴────────────┐ 
+		│ query mdb.models['model'] ├─────query─────┤││  onPartsChangedFromMDB() │
+		└───────────────────────────┘			      └──────────────────────────┘
+		
+		
+Issues Log:
+
+	When working with the interface for model and part selection, the program crashed when a Model is deleted from the model tree.
+	Abaqus issues the following error, which cannot be caught by 'try' statements in the plugin code.
+		
+		*** Error: ABQcaeG.exe / rank 0 / thread 0  encountered a system exception 0xC0000005 (EXCEPTION_ACCESS_VIOLATION)
+
+		*** Error: SymInitialize returned status 87
+		*** ERROR CATEGORY:  UNKNOWN
+
+		*** Error: SymInitialize returned status 87
+		ipc_CONNECTION_BROKEN
+		*** ABAQUS/ABQcaeK rank 0 received the SIGABRT signal
+
+		Abaqus Error: Abaqus/CAE Kernel exited with an error.
+		
+	The only workaround found for this is to make the form modal, so the model tree cannot be accesed from the interface while working
+	with this plugin.
