@@ -27,10 +27,9 @@
 from abaqusConstants import *
 from math import sqrt
 from abaqus import mdb
+import mesh
+import os
 
-modelName = 'meshModel'
-partName = 'meshPart'
-destPartName = 'destPart'
 maxElLabel = 0
 maxNodLabel = 0
 #Coordinates of the centers of the elements, where we will put the new nodes
@@ -42,22 +41,38 @@ nodesCorrelations = []
 #Neighbors already interacted with
 processedNeigh = []
 
-def initialChecks():
-    if (not mdb.models.has_key(modelName)):
-        mdb.Model(modelName)
-        
-    if (not mdb.models[modelName].parts.has_key(partName)):
-        #----------------Create part---------------------
-        #mdb.models[modelName].Part(name=partName, dimensionality=TWO_D_PLANAR , type=DEFORMABLE_BODY)
-        #----------------Import part---------------------
-        mdb.models[modelName].PartFromInputFile(inputFileName='C:/Users/ochoai/Documents/Scripts/' + partName + '.inp')
-        mdb.models['meshModel'].parts.changeKey(fromName=partName.upper(), toName=partName)
-        #print 'Cannot find the part ', partName
-        #exit()
-    
-    if (len(mdb.models[modelName].parts[partName].nodes) == 0):
-        return 'There is no mesh'
+def initialChecks(originModelName, originPartName, destModelName, destPartName):
 
+    #If the part name does not exist, let's check the inp files
+    if(not mdb.models[originModelName].parts.has_key(originPartName)):
+        filePath = os.path.dirname(__file__)
+        file = filePath + '/' + originPartName + '.inp'
+        print "File looked for = ", file
+        if (os.path.isfile(filePath)):
+            mdb.models[originModelName].PartFromInputFile(inputFileName= + path + '/' + originPartName + '.inp')  #It is not documented!!!
+            mdb.models[originModelName].parts.changeKey(fromName=originPartName.upper(), toName=originPartName)
+        else:
+            print 'Specified part not found'
+            return False
+        
+    #There has to be a mesh on the origin part
+    if (len(mdb.models[originModelName].parts[originPartName].nodes) == 0):
+        print 'There is no mesh on the selected part'
+        return False
+    
+    #If the destination model does not exist let's create it
+    if (not mdb.models.has_key(destModelName)):
+        mdb.Model(destModelName)
+
+    #If the destination part already exists we throw an error
+    if (mdb.models[destModelName].parts.has_key(destPartName)):
+        print 'The destiny part already exists'
+        return False
+    else:
+        mdb.models[destModelName].Part(name=destPartName, dimensionality=TWO_D_PLANAR , type=DEFORMABLE_BODY)
+    
+    return True
+          
 def maxLabels(workPart):
     global maxElLabel
     global maxNodLabel
@@ -93,6 +108,8 @@ def calculateCenters(workPart):
 
 def refineMesh(workPart, destPart):
 #------- Main processing loop
+    print 'refine Mesh initiated, workPart = ', workPart.name
+    print 'destPart = ', destPart.name
     for el in workPart.elements:
         #------ get edges -------
         edges = el.getElemEdges()
@@ -106,7 +123,8 @@ def refineMesh(workPart, destPart):
                 elif(adjEl[1]==el):
                     otherEl = adjEl[0]
                 else:
-                    return 'Original element not found within the ElementEdge adjacent element'
+                    print 'Original element not found within the ElementEdge adjacent element'
+                    return
             
                 #Has been the edge already processed?
                 if(otherEl.label in processedNeigh[el.label]):
@@ -201,14 +219,27 @@ def refineMesh(workPart, destPart):
                 destPart.Element(nodes=(n1,n2,n3), elemShape=TRI3)
                 destPart.Element(nodes=(n1,n2,n4), elemShape=TRI3)
             else:
-                return 'Edge element connects more than two elements, cannot process'
-    return 'Malla cargada correctamente'
+                print 'Edge element connects more than two elements, cannot process'
+                return
+    print 'Malla cargada correctamente'
+    
+    #Mesh checks for incompatible normals
+    meshCheck = destPart.verifyMeshQuality(ANALYSIS_CHECKS)
+    #The failed elements have their normal flippes, so we need to toggle it TODO
+    print "Number of failed elements", len(meshCheck['failedElements'])
+    
+    return
 
-def remesh():
-    initialChecks()
-    workPart = mdb.models[modelName].parts[partName]
-    destPart = mdb.models[modelName].Part(name = destPartName, dimensionality=TWO_D_PLANAR , type=DEFORMABLE_BODY)
-    maxLabels(workPart)
+def remesh(originModelName, originPartName, destModelName, destPartName):
+
+    originPart = None
+    destPart = None
+    if (not initialChecks(originModelName, originPartName, destModelName, destPartName)):
+        print 'Mesh refining aborted, initial checks not passed'
+        return
+    originPart = mdb.models[originModelName].parts[originPartName]
+    destPart = mdb.models[destModelName].parts[destPartName]
+    maxLabels(originPart)
     initializeContainers()
-    calculateCenters(workPart)
-    return refineMesh(workPart, destPart)
+    calculateCenters(originPart)
+    return refineMesh(originPart, destPart)

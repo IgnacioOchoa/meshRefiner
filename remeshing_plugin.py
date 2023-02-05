@@ -8,9 +8,10 @@ class FormRemesher(AFXForm):
     def __init__(self, owner):
         AFXForm.__init__(self,owner)
         self.mainCommand = AFXGuiCommand(mode=self, method='remesh', objectName='Remesher', registerQuery = False)
-        self.kwModelName = AFXStringKeyword(self.mainCommand, 'modelName', True, defaultValue='')
-        self.kwOriginPartName = AFXStringKeyword(self.mainCommand, 'meshOriginPartName', True, defaultValue='')
-        self.kwDestPartName = AFXStringKeyword(self.mainCommand, 'meshDestPartName', True, defaultValue='')     
+        self.kwOriginModelName = AFXStringKeyword(self.mainCommand, 'originModelName', True, defaultValue='')
+        self.kwOriginPartName = AFXStringKeyword(self.mainCommand, 'originPartName', True, defaultValue='')
+        self.kwDestPartName = AFXStringKeyword(self.mainCommand, 'destPartName', True, defaultValue='remeshedPart')     
+        self.kwDestModelName = AFXStringKeyword(self.mainCommand, 'destModelName', True, defaultValue='')
         
     def activate(self):
         AFXForm.activate(self)

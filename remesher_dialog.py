@@ -1,6 +1,6 @@
 from abaqusGui import getAFXApp, AFXDataDialog, FXLabel, FXGroupBox, FXHorizontalFrame, AFXComboBox,  AFXTextField, \
 FXCheckButton, showAFXInformationDialog, FXMatrix, FXButton, FXTabBook, FXTabItem, FXFrame, FXVerticalFrame,  \
-AFXCOMBOBOX_VERTICAL, FRAME_SUNKEN, LAYOUT_FILL_X, MATRIX_BY_COLUMNS, LAYOUT_LEFT, LAYOUT_FILL_ROW, LAYOUT_FIX_WIDTH, \
+AFXCOMBOBOX_VERTICAL, FRAME_SUNKEN, LAYOUT_FILL_X, MATRIX_BY_COLUMNS, LAYOUT_LEFT, LAYOUT_RIGHT, LAYOUT_FILL_ROW, LAYOUT_FIX_WIDTH, \
 FXMAPFUNC, SEL_COMMAND, FRAME_NONE, FRAME_NORMAL, FXRGB, getCurrentContext
 from abaqusConstants import *
 from abaqusGui import mdb, sendCommand
@@ -10,7 +10,7 @@ import os
 
 class MainDialog(AFXDataDialog):
 
-    [ID_1, ID_2, ID_3, ID_4, ID_LAST] = range(AFXDataDialog.ID_LAST, AFXDataDialog.ID_LAST+5)
+    [ID_kw1, ID_kw2, ID_kw3, ID_kw4, ID_1, ID_2, ID_3, ID_4, ID_LAST] = range(AFXDataDialog.ID_LAST, AFXDataDialog.ID_LAST+9)
 
     def __init__(self, mode):
     
@@ -20,52 +20,50 @@ class MainDialog(AFXDataDialog):
     
         AFXDataDialog.__init__(self, mode, 'Remesher', self.DISMISS | self.OK)
         
-        mode.kwModelName.setTarget(self)
-        mode.kwModelName.setSelector(self.ID_1)
-        mode.kwOriginPartName.setTarget(self)
-        mode.kwOriginPartName.setSelector(self.ID_2)
+        mode.kwOriginModelName.setTarget(self)
+        mode.kwOriginModelName.setSelector(self.ID_kw1)
         
         mainTabBook = FXTabBook(self, None, 0, LAYOUT_FILL_X)
         FXTabItem(mainTabBook, 'Remesher')
         tab1Frame = FXVerticalFrame(mainTabBook)
         FXTabItem(mainTabBook, 'Examples')
-        tab2Frame = FXHorizontalFrame(mainTabBook)
-        
+        tab2Frame = FXHorizontalFrame(mainTabBook)    
         FXLabel(tab1Frame, 'Enter the source and destiny parts')
         
         gbParts = FXGroupBox(tab1Frame, text="Part names", opts=FRAME_SUNKEN | LAYOUT_FILL_X)
         
         mat = FXMatrix(gbParts, 2, opts= LAYOUT_FILL_X | MATRIX_BY_COLUMNS, w = WFIELDS)
         label1 = FXLabel(mat, 'Origin model name', opts=LAYOUT_LEFT)
-        self.modelsComboBox = AFXComboBox(mat, ncols=1, nvis=1, text="", tgt=mode.kwModelName, sel=0, opts = LAYOUT_FIX_WIDTH, w = WFIELDS)
+        self.modelsComboBox = AFXComboBox(mat, ncols=1, nvis=1, text="", tgt=mode.kwOriginModelName, sel=0, opts = LAYOUT_FIX_WIDTH, w = WFIELDS)
         label2 = FXLabel(mat, 'Origin part name', opts=LAYOUT_LEFT)
         self.partsComboBox =  AFXComboBox(mat, ncols=1, nvis=1, text="", tgt=mode.kwOriginPartName, sel=0, opts = LAYOUT_FIX_WIDTH, w = WFIELDS)
+               
+        self.chbDestModel = FXCheckButton(mat, '', self, self.ID_1, opts=LAYOUT_RIGHT)
+        self.chbDestModel.setCheck(True)
+        labelChbDestModel = FXLabel(mat, 'Use the same model as destination', opts=LAYOUT_LEFT)
         
-        FXFrame(mat, opts = FRAME_NONE)  #Frame placeholder for matrix
+        label3 = FXLabel(mat, 'Destiny model name', opts=LAYOUT_LEFT)
+        self.txtFieldOriginModel = AFXTextField(mat, ncols=1, labelText="", opts=LAYOUT_FIX_WIDTH, w=WFIELDS, tgt=mode.kwDestModelName, sel=0)
         
-        chbDestModel = FXCheckButton(mat, 'Use the same model as destination')
-        chbDestModel.setCheck(True)
-        
-        label3 = FXLabel(mat, 'Destiny part name', opts=LAYOUT_LEFT)
-        AFXTextField(mat, ncols=1, labelText="", opts = LAYOUT_FIX_WIDTH, w = WFIELDS)
+        label4 = FXLabel(mat, 'Destiny part name', opts=LAYOUT_LEFT)
+        AFXTextField(mat, ncols=1, labelText="", opts = LAYOUT_FIX_WIDTH, w = WFIELDS, tgt=mode.kwDestPartName, sel=0)
             
         gbParameters = FXGroupBox(tab1Frame, text="Parameters", opts=FRAME_SUNKEN | LAYOUT_FILL_X)
         FXCheckButton(gbParameters, "Maximum quality")       
-        
-        
-        FXMAPFUNC(self, SEL_COMMAND, self.ID_1, MainDialog.onModelChangedFromGUI)   #(4)
-
+         
+        FXMAPFUNC(self, SEL_COMMAND, self.ID_kw1, MainDialog.onModelChangedFromGUI)   #(4)
+        FXMAPFUNC(self, SEL_COMMAND, self.ID_1, MainDialog.onCheckButtonToggled)
         
     def onModelChangedFromMDB(self):
         # This function is called in response to a query in the mdb.models repository
         # We need to react to an update in the repository
         modelKeys = mdb.models.keys()
-        currentModelName = self.form.kwModelName.getValue()
+        currentModelName = self.form.kwOriginModelName.getValue()
         if (not currentModelName in modelKeys):             # If the first time we load the plugin or if the previous model has been eliminated                                 
             currentModelName = mdb.models.keys()[0]
-        self.form.kwModelName.setValue(currentModelName)                            #(1)
-        self.updateCBmodels()                                                       #(2)
-        self.updateParts(currentModelName)                                          #(3)
+        self.form.kwOriginModelName.setValue(currentModelName)                        #(1)
+        self.updateCBmodels()                                                         #(2)
+        self.updateParts(currentModelName)                                            #(3)
         
     def updateParts(self, currentModelName):
         modelKeys = mdb.models.keys()
@@ -85,10 +83,12 @@ class MainDialog(AFXDataDialog):
                     self.form.kwOriginPartName.setValue(mdb.models[currentModelName].parts.keys()[0]) #(6)
         
     def onModelChangedFromGUI(self, sender, sel, ptr):
-        self.updateParts(self.form.kwModelName.getValue())                          #(5)
+        if(self.chbDestModel.getCheck()):
+            self.form.kwDestModelName.setValue(self.form.kwOriginModelName.getValue())
+        self.updateParts(self.form.kwOriginModelName.getValue())                      #(5)
                
     def onPartsChangedFromMDB(self):      
-        currentModel = self.form.kwModelName.getValue()
+        currentModel = self.form.kwOriginModelName.getValue()
         if(not self.form.kwOriginPartName.getValue() in mdb.models[currentModel].parts.keys()): #If the current part is no longer in the model, select the first one in the list
             if (len(mdb.models[currentModel].parts) > 0): # We have to check that the part repository is not empty
                 self.form.kwOriginPartName.setValue(mdb.models[currentModel].parts.keys()[0])
@@ -105,7 +105,7 @@ class MainDialog(AFXDataDialog):
         
     def updateCBparts(self):
         self.partsComboBox.clearItems()
-        modelName = self.form.kwModelName.getValue()
+        modelName = self.form.kwOriginModelName.getValue()
         nroParts = len(mdb.models[modelName].parts)
         if (nroParts == 0):
             self.partsComboBox.disable()
@@ -119,17 +119,32 @@ class MainDialog(AFXDataDialog):
     def show(self):
         AFXDataDialog.show(self)
         currentModelName = getCurrentContext()['modelName']
-        self.form.kwModelName.setValue(currentModelName)
+        self.form.kwOriginModelName.setValue(currentModelName)
         mdb.models.registerQuery(self.onModelChangedFromMDB, True)
         
     def showModal(self, occludedWindow):
         AFXDataDialog.showModal(self, occludedWindow)
         currentModelName = getCurrentContext()['modelName']
-        self.form.kwModelName.setValue(currentModelName)
+        self.form.kwOriginModelName.setValue(currentModelName)
         mdb.models.registerQuery(self.onModelChangedFromMDB, True)
+        
+        #Preparing the destination model keyword
+        if (self.form.kwDestModelName.getValue() == ''):
+            self.form.kwDestModelName.setValue(currentModelName)
+        
+        #The destination model selection is initially disabled
+        self.txtFieldOriginModel.disable()
                
     def hide(self):
         mdb.models.unregisterQuery(self.onModelChangedFromMDB)
-        mdb.models[self.form.kwModelName.getValue()].unregisterQuery(self.onPartsChangedFromMDB)
+        mdb.models[self.form.kwOriginModelName.getValue()].unregisterQuery(self.onPartsChangedFromMDB)
         AFXDataDialog.hide(self)
+        
+    def onCheckButtonToggled(self, sender, sel, ptr):
+        if sender.getCheck():
+            self.txtFieldOriginModel.disable()
+            self.form.kwDestModelName.setValue(self.form.kwOriginModelName.getValue())
+        else:
+            self.txtFieldOriginModel.enable()
+        
 
