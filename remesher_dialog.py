@@ -1,12 +1,15 @@
 from abaqusGui import getAFXApp, AFXDataDialog, FXLabel, FXGroupBox, FXHorizontalFrame, AFXComboBox,  AFXTextField, \
-FXCheckButton, showAFXInformationDialog, FXMatrix, FXButton, FXTabBook, FXTabItem, FXFrame, FXVerticalFrame,  \
-AFXCOMBOBOX_VERTICAL, FRAME_SUNKEN, LAYOUT_FILL_X, MATRIX_BY_COLUMNS, LAYOUT_LEFT, LAYOUT_RIGHT, LAYOUT_FILL_ROW, LAYOUT_FIX_WIDTH, \
-FXMAPFUNC, SEL_COMMAND, FRAME_NONE, FRAME_NORMAL, FXRGB, getCurrentContext
+AFXCOMBOBOX_VERTICAL, AFXVerticalAligner, AFXList, FXSwitcher, FXText, FXFont, AFXTEXTFIELD_READONLY, \
+FXCheckButton, showAFXInformationDialog, FXMatrix, FXButton, FXTabBook, FXTabItem, FXFrame, FXVerticalFrame, FRAME_RIDGE, \
+FRAME_SUNKEN, LAYOUT_FILL_X, MATRIX_BY_COLUMNS, LAYOUT_LEFT, LAYOUT_RIGHT, LAYOUT_FILL_ROW, LAYOUT_FIX_WIDTH, HSCROLLING_OFF, \
+JUSTIFY_CENTER_X, FRAME_LINE, FONTSLANT_ITALIC, TABBOOK_NORMAL, \
+FXMAPFUNC, SEL_COMMAND, FRAME_NONE, FRAME_NORMAL, FXRGB, TEXT_WORDWRAP, JUSTIFY_LEFT, getCurrentContext, afxCreatePNGIcon
 from abaqusConstants import *
 from abaqusGui import mdb, sendCommand
 import os
 
 # To log things in the message area -->   getAFXApp().getAFXMainWindow().writeToMessageArea('Modelo cambiado')
+# Default font: 'Segoe UI' size 9. To create such font use FXFont(getAFXApp(), 'Segoe UI', 9), be careful because .getSize() returns 90
 
 class MainDialog(AFXDataDialog):
 
@@ -14,7 +17,7 @@ class MainDialog(AFXDataDialog):
 
     def __init__(self, mode):
     
-        WFIELDS = 200
+        WFIELDS = 120
         self.prevModelName = ''
         self.form = mode
     
@@ -23,37 +26,98 @@ class MainDialog(AFXDataDialog):
         mode.kwOriginModelName.setTarget(self)
         mode.kwOriginModelName.setSelector(self.ID_kw1)
         
-        mainTabBook = FXTabBook(self, None, 0, LAYOUT_FILL_X)
+        mainTabBook = FXTabBook(self, tgt=self, sel=self.ID_3, opts = TABBOOK_NORMAL | LAYOUT_FILL_X)
         FXTabItem(mainTabBook, 'Remesher')
         tab1Frame = FXVerticalFrame(mainTabBook)
         FXTabItem(mainTabBook, 'Examples')
-        tab2Frame = FXHorizontalFrame(mainTabBook)    
+        tab2Frame = FXVerticalFrame(mainTabBook)    
         FXLabel(tab1Frame, 'Enter the source and destiny parts')
         
-        gbParts = FXGroupBox(tab1Frame, text="Part names", opts=FRAME_SUNKEN | LAYOUT_FILL_X)
+        #Tab 1   ------------------------------------------------------------------------------------------------------------------------------------\
+        gbParts = FXGroupBox(tab1Frame, text="Part names", opts=FRAME_SUNKEN | LAYOUT_FILL_X)                                                       #|
+        va = AFXVerticalAligner(gbParts, opts = LAYOUT_FILL_X)                                                                                      #|
+        self.modelsComboBox = AFXComboBox(va, ncols=1, nvis=1, text="Origin model name", tgt=mode.kwOriginModelName, sel=0, opts = LAYOUT_FILL_X)   #|
+        self.partsComboBox =  AFXComboBox(va, ncols=1, nvis=1, text="Origin part name", tgt=mode.kwOriginPartName, sel=0, opts = LAYOUT_FILL_X)     #|        
+        self.chbDestModel = FXCheckButton(va, 'Use the same model as destination', self, self.ID_1)                                                 #|
+        self.chbDestModel.setCheck(True)                                                                                                            #|
+        self.txtFieldDestModel = AFXTextField(va, ncols=1, labelText="Destiny model name", tgt=mode.kwDestModelName, sel=0, opts = LAYOUT_FILL_X)   #|
+        self.txtFieldDestPart = AFXTextField(va, ncols=1, labelText="Destiny part name", tgt=mode.kwDestPartName, sel=0, opts = LAYOUT_FILL_X)      #|     
+        gbParameters = FXGroupBox(tab1Frame, text="Parameters", opts=FRAME_SUNKEN | LAYOUT_FILL_X)                                                  #|
+        FXCheckButton(gbParameters, "Maximum quality")                                                                                              #|
+        #--------------------------------------------------------------------------------------------------------------------------------------------/
+
+        #Tab 2    -------------------------------------------------------------------------------------------------------\
         
-        mat = FXMatrix(gbParts, 2, opts= LAYOUT_FILL_X | MATRIX_BY_COLUMNS, w = WFIELDS)
-        label1 = FXLabel(mat, 'Origin model name', opts=LAYOUT_LEFT)
-        self.modelsComboBox = AFXComboBox(mat, ncols=1, nvis=1, text="", tgt=mode.kwOriginModelName, sel=0, opts = LAYOUT_FIX_WIDTH, w = WFIELDS)
-        label2 = FXLabel(mat, 'Origin part name', opts=LAYOUT_LEFT)
-        self.partsComboBox =  AFXComboBox(mat, ncols=1, nvis=1, text="", tgt=mode.kwOriginPartName, sel=0, opts = LAYOUT_FIX_WIDTH, w = WFIELDS)
-               
-        self.chbDestModel = FXCheckButton(mat, '', self, self.ID_1, opts=LAYOUT_RIGHT)
-        self.chbDestModel.setCheck(True)
-        labelChbDestModel = FXLabel(mat, 'Use the same model as destination', opts=LAYOUT_LEFT)
-        
-        label3 = FXLabel(mat, 'Destiny model name', opts=LAYOUT_LEFT)
-        self.txtFieldOriginModel = AFXTextField(mat, ncols=1, labelText="", opts=LAYOUT_FIX_WIDTH, w=WFIELDS, tgt=mode.kwDestModelName, sel=0)
-        
-        label4 = FXLabel(mat, 'Destiny part name', opts=LAYOUT_LEFT)
-        AFXTextField(mat, ncols=1, labelText="", opts = LAYOUT_FIX_WIDTH, w = WFIELDS, tgt=mode.kwDestPartName, sel=0)
+        mainVFrame = FXVerticalFrame(tab2Frame)
+        tab2Title = FXLabel(mainVFrame, text = 'List of examples available', opts = FRAME_LINE | LAYOUT_FILL_X | JUSTIFY_CENTER_X)                                                         #|
+        horFr = FXHorizontalFrame(mainVFrame)
+        vfListLabels = FXVerticalFrame(horFr, opts=LAYOUT_FILL_X)
+                                                                                                                        #|
+        #Create and populate example list 
+        vfList = FXVerticalFrame(vfListLabels, opts = FRAME_LINE | LAYOUT_FILL_X)
+        self.exampleList = AFXList(vfList, nvis = 10, tgt = self, sel = self.ID_2, opts = HSCROLLING_OFF)         #|            
+        for name in self.form.examplePartNames:                                                                         #|
+            self.exampleList.appendItem(text=name)                                                                      #|
+        self.exampleList.selectItem(0)                                              
+        verFr = FXVerticalFrame(horFr)
+                                                       #|
+        #Create and populate switch                                                                                     #|
+        self.switcher = FXSwitcher(verFr)                                                                               #|
+        for icon in self.form.exampleImgs:                                                                              #|
+            FXLabel(self.switcher, text='', ic=icon)                                                                    
             
-        gbParameters = FXGroupBox(tab1Frame, text="Parameters", opts=FRAME_SUNKEN | LAYOUT_FILL_X)
-        FXCheckButton(gbParameters, "Maximum quality")       
-         
+        #self.labelDescription = FXLabel(verFr, text= 'Description: ' + self.form.examplePartDescriptions[0], w=100, h=60, opts=JUSTIFY_LEFT)
+        
+        self.labelDescription = FXText(verFr, opts = HSCROLLING_OFF | LAYOUT_FILL_X | TEXT_WORDWRAP)
+        self.labelDescription.setText('Description: ' + self.form.examplePartDescriptions[0])
+        
+        botFrame = FXHorizontalFrame(mainVFrame)
+        #mode.kwExampleOriginModelName.setValue('Placeholder 1')
+        #mode.kwExampleOriginPartName.setValue('Placeholder 2')
+        #mode.kwExampleDestPartName.setValue('Placeholder 3')
+        
+        vfListLabels = FXVerticalFrame(vfListLabels, opts = LAYOUT_FILL_X)
+        exLabel1 = FXLabel(vfListLabels, text='Model:')
+        exField1 = AFXTextField(vfListLabels, ncols=1, labelText='', tgt=mode.kwExampleOriginModelName, pt=-3, pl=10, w=WFIELDS, \
+                                sel=0, opts = AFXTEXTFIELD_READONLY | FRAME_NONE | LAYOUT_FIX_WIDTH)
+        exLabel2 = FXLabel(vfListLabels, text='Origin part: ')
+        exField2 = AFXTextField(vfListLabels, ncols=1, labelText='', tgt=mode.kwExampleOriginPartName, pt=-3, pl=10,\
+                     sel=0, opts = LAYOUT_FILL_X | AFXTEXTFIELD_READONLY | FRAME_NONE)
+        exLabel3 = FXLabel(vfListLabels, text='Destiny part: ')
+        exField3 = AFXTextField(vfListLabels, ncols=1, labelText='', tgt=mode.kwExampleDestPartName, pt=-3, pl=10, \
+                   sel=0, opts = LAYOUT_FILL_X | AFXTEXTFIELD_READONLY | FRAME_NONE)
+        
+        newFont = FXFont(getAFXApp(), 'Segoe UI', 10)
+
+        tab2Title.setFont(newFont)
+        #|
+        #----------------------------------------------------------------------------------------------------------------/
+            
+        #Connections         
         FXMAPFUNC(self, SEL_COMMAND, self.ID_kw1, MainDialog.onModelChangedFromGUI)   #(4)
         FXMAPFUNC(self, SEL_COMMAND, self.ID_1, MainDialog.onCheckButtonToggled)
+        FXMAPFUNC(self, SEL_COMMAND, self.ID_2, MainDialog.onListChanged)
+        FXMAPFUNC(self, SEL_COMMAND, self.ID_3, MainDialog.onTabChanged)
         
+    def onListChanged(self, sender, sel, ptr):
+        index = self.exampleList.getSingleSelection()
+        self.switcher.setCurrent(index)
+        self.labelDescription.setText('Description: ' + self.form.examplePartDescriptions[index])
+        self.form.kwExampleOriginModelName.setValue(self.form.exampleMdbNames[index]['model'])
+        self.form.kwExampleDestModelName.setValue(self.form.exampleMdbNames[index]['model'])
+        self.form.kwExampleOriginPartName.setValue(self.form.exampleMdbNames[index]['origin'])
+        self.form.kwExampleDestPartName.setValue(self.form.exampleMdbNames[index]['destiny'])
+        self.form.kwExampleInpFileName.setValue(self.form.inpFiles[index])
+        
+    def onTabChanged(self, sender, sel, ptr):
+        index = sender.getCurrent()
+        if (index==0):
+            self.form.mainCommand.activate()
+            self.form.exampleCommand.deactivate()
+        elif (index==1):
+            self.form.mainCommand.deactivate()
+            self.form.exampleCommand.activate()
+           
     def onModelChangedFromMDB(self):
         # This function is called in response to a query in the mdb.models repository
         # We need to react to an update in the repository
@@ -133,7 +197,7 @@ class MainDialog(AFXDataDialog):
             self.form.kwDestModelName.setValue(currentModelName)
         
         #The destination model selection is initially disabled
-        self.txtFieldOriginModel.disable()
+        self.txtFieldDestModel.disable()
                
     def hide(self):
         mdb.models.unregisterQuery(self.onModelChangedFromMDB)
@@ -142,9 +206,9 @@ class MainDialog(AFXDataDialog):
         
     def onCheckButtonToggled(self, sender, sel, ptr):
         if sender.getCheck():
-            self.txtFieldOriginModel.disable()
+            self.txtFieldDestModel.disable()
             self.form.kwDestModelName.setValue(self.form.kwOriginModelName.getValue())
         else:
-            self.txtFieldOriginModel.enable()
+            self.txtFieldDestModel.enable()
         
 

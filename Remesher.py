@@ -41,15 +41,18 @@ nodesCorrelations = []
 #Neighbors already interacted with
 processedNeigh = []
 
-def initialChecks(originModelName, originPartName, destModelName, destPartName):
+def initialChecks(originModelName, originPartName, destModelName, destPartName, inpFileName):
+
+    #If the original model does not exist, we create it
+    if (not mdb.models.has_key(originModelName)):
+        mdb.Model(originModelName)
 
     #If the part name does not exist, let's check the inp files
     if(not mdb.models[originModelName].parts.has_key(originPartName)):
         filePath = os.path.dirname(__file__)
-        file = filePath + '/' + originPartName + '.inp'
-        print "File looked for = ", file
-        if (os.path.isfile(filePath)):
-            mdb.models[originModelName].PartFromInputFile(inputFileName= + path + '/' + originPartName + '.inp')  #It is not documented!!!
+        file = filePath + '/examples/' + inpFileName
+        if (os.path.isfile(file)):
+            mdb.models[originModelName].PartFromInputFile(inputFileName = file)  #It is not documented!!!
             mdb.models[originModelName].parts.changeKey(fromName=originPartName.upper(), toName=originPartName)
         else:
             print 'Specified part not found'
@@ -69,7 +72,7 @@ def initialChecks(originModelName, originPartName, destModelName, destPartName):
         print 'The destiny part already exists'
         return False
     else:
-        mdb.models[destModelName].Part(name=destPartName, dimensionality=TWO_D_PLANAR , type=DEFORMABLE_BODY)
+        mdb.models[destModelName].Part(name=destPartName, dimensionality=TWO_D_PLANAR , type=DEFORMABLE_BODY)   ###TO BE UPDATED WITH 3D PARTS
     
     return True
           
@@ -108,8 +111,6 @@ def calculateCenters(workPart):
 
 def refineMesh(workPart, destPart):
 #------- Main processing loop
-    print 'refine Mesh initiated, workPart = ', workPart.name
-    print 'destPart = ', destPart.name
     for el in workPart.elements:
         #------ get edges -------
         edges = el.getElemEdges()
@@ -230,11 +231,10 @@ def refineMesh(workPart, destPart):
     
     return
 
-def remesh(originModelName, originPartName, destModelName, destPartName):
-
+def remesh(originModelName, originPartName, destModelName, destPartName, inpFileName=''):
     originPart = None
     destPart = None
-    if (not initialChecks(originModelName, originPartName, destModelName, destPartName)):
+    if (not initialChecks(originModelName, originPartName, destModelName, destPartName, inpFileName)):
         print 'Mesh refining aborted, initial checks not passed'
         return
     originPart = mdb.models[originModelName].parts[originPartName]
